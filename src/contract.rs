@@ -2,7 +2,7 @@ use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Respons
 use crate::error::ContractError;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::state::{OWNER, TOTAL_SUPPLY, PEG_PRICE};
-use crate::helpers::{validate_positive_amount};
+use crate::helpers::validate_positive_amount;
 
 #[entry_point]
 pub fn instantiate(
