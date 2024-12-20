@@ -1,13 +1,6 @@
-{% unless minimal %}use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_std::Addr;
-use cw_storage_plus::Item;
+use cw_storage_plus::{Item};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: Addr,
-}
-
-pub const STATE: Item<State> = Item::new("state");{% endunless %}
+pub const OWNER: Item<Addr> = Item::new("owner");
+pub const TOTAL_SUPPLY: Item<u128> = Item::new("total_supply");
+pub const PEG_PRICE: Item<u128> = Item::new("peg_price");

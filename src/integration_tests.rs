@@ -1,78 +1,81 @@
 #[cfg(test)]
-mod tests {
-    use crate::helpers::CwTemplateContract;
-    use crate::msg::InstantiateMsg;
-    use cosmwasm_std::testing::MockApi;
-    use cosmwasm_std::{Addr, Coin, Empty, Uint128};
-    use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
+mod integration_tests {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{from_binary, Addr};
 
-    pub fn contract_template() -> Box<dyn Contract<Empty>> {
-        let contract = ContractWrapper::new(
-            crate::contract::execute,
-            crate::contract::instantiate,
-            crate::contract::query,
-        );
-        Box::new(contract)
+    use crate::contract::{instantiate, execute, query};
+    use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
+    use crate::state::{OWNER, TOTAL_SUPPLY, PEG_PRICE};
+
+    #[test]
+    fn test_instantiate() {
+        let mut deps = mock_dependencies();
+
+        let msg = InstantiateMsg {
+            initial_supply: 1_000_000,
+            peg_price: 1_000,
+        };
+
+        let info = mock_info("creator", &[]);
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        assert_eq!(res.messages.len(), 0);
+        assert_eq!(OWNER.load(&deps.storage).unwrap(), Addr::unchecked("creator"));
+        assert_eq!(TOTAL_SUPPLY.load(&deps.storage).unwrap(), 1_000_000);
+        assert_eq!(PEG_PRICE.load(&deps.storage).unwrap(), 1_000);
     }
 
-    const USER: &str = "USER";
-    const ADMIN: &str = "ADMIN";
-    const NATIVE_DENOM: &str = "denom";
+    #[test]
+    fn test_mint() {
+        let mut deps = mock_dependencies();
 
-    fn mock_app() -> App {
-        AppBuilder::new().build(|router, _, storage| {
-            router
-                .bank
-                .init_balance(
-                    storage,
-                    &MockApi::default().addr_make(USER),
-                    vec![Coin {
-                        denom: NATIVE_DENOM.to_string(),
-                        amount: Uint128::new(1),
-                    }],
-                )
-                .unwrap();
-        })
+        let init_msg = InstantiateMsg {
+            initial_supply: 1_000_000,
+            peg_price: 1_000,
+        };
+        let info = mock_info("creator", &[]);
+        instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+
+        let exec_msg = ExecuteMsg::Mint { amount: 500_000 };
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_msg).unwrap();
+
+        assert_eq!(res.messages.len(), 0);
+        assert_eq!(TOTAL_SUPPLY.load(&deps.storage).unwrap(), 1_500_000);
     }
 
-    fn proper_instantiate() -> (App, CwTemplateContract) {
-        let mut app = mock_app();
-        let cw_template_id = app.store_code(contract_template());
+    #[test]
+    fn test_burn() {
+        let mut deps = mock_dependencies();
 
-        let user = app.api().addr_make(USER);
-        assert_eq!(
-            app.wrap().query_balance(user, NATIVE_DENOM).unwrap().amount,
-            Uint128::new(1)
-        );
+        let init_msg = InstantiateMsg {
+            initial_supply: 1_000_000,
+            peg_price: 1_000,
+        };
+        let info = mock_info("creator", &[]);
+        instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
 
-        let msg = InstantiateMsg { count: 1i32 };
-        let cw_template_contract_addr = app
-            .instantiate_contract(
-                cw_template_id,
-                Addr::unchecked(ADMIN),
-                &msg,
-                &[],
-                "test",
-                None,
-            )
-            .unwrap();
+        let exec_msg = ExecuteMsg::Burn { amount: 400_000 };
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_msg).unwrap();
 
-        let cw_template_contract = CwTemplateContract(cw_template_contract_addr);
-
-        (app, cw_template_contract)
+        assert_eq!(res.messages.len(), 0);
+        assert_eq!(TOTAL_SUPPLY.load(&deps.storage).unwrap(), 600_000);
     }
 
-    mod count {
-        use super::*;
-        use crate::msg::ExecuteMsg;
+    #[test]
+    fn test_update_peg_price() {
+        let mut deps = mock_dependencies();
 
-        #[test]
-        fn count() {
-            let (mut app, cw_template_contract) = proper_instantiate();
+        let init_msg = InstantiateMsg {
+            initial_supply: 1_000_000,
+            peg_price: 1_000,
+        };
+        let info = mock_info("creator", &[]);
+        instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
 
-            let msg = ExecuteMsg::Increment {};
-            let cosmos_msg = cw_template_contract.call(msg).unwrap();
-            app.execute(Addr::unchecked(USER), cosmos_msg).unwrap();
-        }
+        let exec_msg = ExecuteMsg::UpdatePegPrice { peg_price: 1_500 };
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_msg).unwrap();
+
+        assert_eq!(res.messages.len(), 0);
+        assert_eq!(PEG_PRICE.load(&deps.storage).unwrap(), 1_500);
     }
 }
