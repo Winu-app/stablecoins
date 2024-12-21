@@ -11,4 +11,7 @@ pub enum ContractError {
 
     #[error("Insufficient Funds")]
     InsufficientFunds {},
+
+    #[error("Withdrawal Limit Exceeded")]
+    WithdrawalLimitExceeded {},
 }
