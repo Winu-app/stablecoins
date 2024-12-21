@@ -13,6 +13,8 @@ pub enum QueryMsg {
     GetSupply {},
     #[returns(u128)]
     GetPegPrice {},
+    #[returns(u128)]
+    GetWithdrawalLimit {},
 }
 
 #[cw_serde]
@@ -20,4 +22,7 @@ pub enum ExecuteMsg {
     Mint { amount: u128 },
     Burn { amount: u128 },
     UpdatePegPrice { peg_price: u128 },
+    Deposit { amount: u128 },
+    Withdraw { amount: u128 },
+    UpdateWithdrawalLimit { limit: u128 },
 }
