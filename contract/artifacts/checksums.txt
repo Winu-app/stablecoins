@@ -1,0 +1,1 @@
+1b42ad33f9ce67e824223bb0dcd9da278c3e166e0aa86b05aeb2ae3c66232c52  stablecoin.wasm
