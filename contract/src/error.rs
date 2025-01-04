@@ -14,4 +14,7 @@ pub enum ContractError {
 
     #[error("Withdrawal Limit Exceeded")]
     WithdrawalLimitExceeded {},
+
+    #[error("Exchange already exists for this owner.")]
+    ExchangeAlreadyExists {},
 }

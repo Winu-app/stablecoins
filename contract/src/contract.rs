@@ -1,8 +1,10 @@
-use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, to_json_binary};
+use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use crate::error::ContractError;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
-use crate::state::{OWNER, TOTAL_SUPPLY, PEG_PRICE, WITHDRAWAL_LIMIT};
+use crate::state::{OWNER, TOTAL_SUPPLY, PEG_PRICE, WITHDRAWAL_LIMIT, EXCHANGES};
 use crate::helpers::validate_positive_amount;
+
+use crate::msg::Exchange;
 
 #[entry_point]
 pub fn instantiate(
@@ -33,8 +35,37 @@ pub fn execute(
         ExecuteMsg::Deposit { amount } => execute_deposit(deps, info, amount),
         ExecuteMsg::Withdraw { amount } => execute_withdraw(deps, info, amount),
         ExecuteMsg::UpdateWithdrawalLimit { limit } => execute_update_withdrawal_limit(deps, info, limit),
+        ExecuteMsg::SynchronizeWithMain {  } => todo!(),//TODO
+        ExecuteMsg::CreateNewExchange { name, withdrawal_limit, initial_funds } => execute_create_new_exchange(deps, info,name,initial_funds,withdrawal_limit)
     }
 }
+
+fn execute_create_new_exchange(
+    deps: DepsMut,
+    info: MessageInfo,
+    name: String,
+    initial_funds: u128,
+    withdrawal_limit: u128,
+)-> Result<Response, ContractError> {
+    validate_positive_amount(initial_funds)?;
+
+    if EXCHANGES.has(deps.storage, &info.sender) {
+        return Err(ContractError::ExchangeAlreadyExists {});
+    }
+
+    let exchange = &Exchange {
+        name,
+        balance: initial_funds,
+        withdrawal_limit,
+        owner: info.sender.clone(),
+    };
+
+    EXCHANGES.save(deps.storage, &info.sender, exchange)?;
+    Ok(Response::new().add_attribute("action", "create exchange").add_attribute("initial_funds", initial_funds.to_string()))
+}
+
+
+
 
 fn execute_mint(
     deps: DepsMut,
@@ -90,6 +121,7 @@ fn execute_update_peg_price(
 
     Ok(Response::new().add_attribute("action", "update_peg_price").add_attribute("peg_price", peg_price.to_string()))
 }
+
 
 fn execute_deposit(
     deps: DepsMut,
@@ -153,5 +185,12 @@ pub fn query(
         QueryMsg::GetSupply {} => to_json_binary(&TOTAL_SUPPLY.load(deps.storage)?),
         QueryMsg::GetPegPrice {} => to_json_binary(&PEG_PRICE.load(deps.storage)?),
         QueryMsg::GetWithdrawalLimit {} => to_json_binary(&WITHDRAWAL_LIMIT.load(deps.storage)?),
+        QueryMsg::GetExchange { owner } => query_get_exchange(deps, owner),
     }
+}
+
+pub fn query_get_exchange(deps: Deps, owner: Addr) -> StdResult<Binary> {
+    
+    let exchange = EXCHANGES.load(deps.storage, &owner)?;
+    to_json_binary(&exchange)
 }
