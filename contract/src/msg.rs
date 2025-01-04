@@ -1,4 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Addr, Uint128};
+use serde::{Deserialize, Serialize};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -25,4 +27,18 @@ pub enum ExecuteMsg {
     Deposit { amount: u128 },
     Withdraw { amount: u128 },
     UpdateWithdrawalLimit { limit: u128 },
+    SynchronizeWithMain {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct User {
+    pub wallet: Addr,
+    pub balance: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Exchange {
+    pub name: String,
+    pub balance: Uint128,
+    pub withdrawal_limit: Uint128,
 }
