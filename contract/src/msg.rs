@@ -31,8 +31,10 @@ pub enum ExecuteMsg {
     Deposit { amount: u128 },
     Withdraw { amount: u128 },
     UpdateWithdrawalLimit { limit: u128 },
-    SynchronizeWithMain {},
+    CorrectTotalSupply {desired_total_supply: u128},
     CreateNewExchange { name: String, withdrawal_limit: u128, initial_funds: u128 },
+    BuyFromExchange { exchange_address: Addr, amount: u128 },
+    SellToExchange { exchange_address: Addr, amount: u128 },
 }
 
 

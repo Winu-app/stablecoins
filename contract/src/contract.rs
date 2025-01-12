@@ -1,7 +1,7 @@
 use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use crate::error::ContractError;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
-use crate::state::{OWNER, TOTAL_SUPPLY, PEG_PRICE, WITHDRAWAL_LIMIT, EXCHANGES};
+use crate::state::{BALANCES, EXCHANGES, OWNER, PEG_PRICE, TOTAL_SUPPLY, WITHDRAWAL_LIMIT};
 use crate::helpers::validate_positive_amount;
 
 use crate::msg::Exchange;
@@ -35,10 +35,42 @@ pub fn execute(
         ExecuteMsg::Deposit { amount } => execute_deposit(deps, info, amount),
         ExecuteMsg::Withdraw { amount } => execute_withdraw(deps, info, amount),
         ExecuteMsg::UpdateWithdrawalLimit { limit } => execute_update_withdrawal_limit(deps, info, limit),
-        ExecuteMsg::SynchronizeWithMain {  } => todo!(),//TODO
-        ExecuteMsg::CreateNewExchange { name, withdrawal_limit, initial_funds } => execute_create_new_exchange(deps, info,name,initial_funds,withdrawal_limit)
+        ExecuteMsg::CorrectTotalSupply { desired_total_supply } => execute_correct_total_supply(deps,info, desired_total_supply),//TODO
+        ExecuteMsg::CreateNewExchange { name, withdrawal_limit, initial_funds } => execute_create_new_exchange(deps, info,name,initial_funds,withdrawal_limit),
+        ExecuteMsg::BuyFromExchange { exchange_address,amount } => execute_buy_from_exchange(deps, info, exchange_address, amount),
+        ExecuteMsg::SellToExchange { exchange_address,amount } => execute_sell_to_exchange(deps, info, exchange_address, amount),
     }
 }
+
+fn execute_correct_total_supply(
+    deps: DepsMut, 
+    info: MessageInfo,
+    desired_total_supply: u128
+)-> Result<Response, ContractError>{
+    validate_positive_amount(desired_total_supply)?;
+    let owner = OWNER.load(deps.storage)?;
+    if info.sender != owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let difference = desired_total_supply - TOTAL_SUPPLY.load(deps.storage)?;
+
+    if difference > 0 {
+        TOTAL_SUPPLY.update(deps.storage, |supply| -> StdResult<_> {
+            Ok(supply + difference)
+        })?;
+    } else {
+        TOTAL_SUPPLY.update(deps.storage, |supply| -> Result<_, ContractError> {
+            if supply < desired_total_supply {
+                return Err(ContractError::InsufficientFunds {});
+            }
+            Ok(supply - difference)
+        })?;
+    }
+
+    Ok(Response::new().add_attribute("action", "create exchange").add_attribute("correct supply", desired_total_supply.to_string()))
+}
+
 
 fn execute_create_new_exchange(
     deps: DepsMut,
@@ -63,8 +95,6 @@ fn execute_create_new_exchange(
     EXCHANGES.save(deps.storage, &info.sender, exchange)?;
     Ok(Response::new().add_attribute("action", "create exchange").add_attribute("initial_funds", initial_funds.to_string()))
 }
-
-
 
 
 fn execute_mint(
@@ -104,6 +134,36 @@ fn execute_burn(
     })?;
 
     Ok(Response::new().add_attribute("action", "burn").add_attribute("amount", amount.to_string()))
+}
+
+
+fn execute_buy_from_exchange(deps:DepsMut, info:MessageInfo, exchange_address:Addr, amount: u128)-> Result<Response, ContractError>{
+    validate_positive_amount(amount)?;
+    let exchange = &mut EXCHANGES.load(deps.storage, &exchange_address)?;
+
+    if amount > exchange.balance {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    exchange.balance -= amount;
+
+    BALANCES.update(deps.storage, &info.sender, |balance| -> Result<_, ContractError> {
+        Ok(balance.unwrap_or(0) + amount)
+    })?;
+
+    Ok(Response::new().add_attribute("action", "buy_coins").add_attribute("amount", amount.to_string()))
+}
+
+fn execute_sell_to_exchange(deps:DepsMut, info:MessageInfo, exchange_address:Addr, amount: u128)-> Result<Response, ContractError>{
+    validate_positive_amount(amount)?;
+    let exchange = &mut EXCHANGES.load(deps.storage, &exchange_address)?;
+    exchange.balance += amount;
+
+    BALANCES.update(deps.storage, &info.sender, |balance| -> Result<_, ContractError> {
+        Ok(balance.unwrap_or(0) - amount)
+    })?;
+
+    Ok(Response::new().add_attribute("action", "sell_coins").add_attribute("amount", amount.to_string()))
 }
 
 fn execute_update_peg_price(
