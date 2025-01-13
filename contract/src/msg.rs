@@ -18,9 +18,12 @@ pub enum QueryMsg {
     GetPegPrice {},
     #[returns(u128)]
     GetWithdrawalLimit {},
-
     #[returns(Exchange)]
     GetExchange { owner: Addr },
+    #[returns(u128)]
+    GetUserBalance{address:Addr},
+    #[returns(u128)]
+    GetExchangeBalance{address:Addr}
 }
 
 #[cw_serde]
@@ -37,11 +40,6 @@ pub enum ExecuteMsg {
     SellToExchange { exchange_address: Addr, amount: u128 },
 }
 
-
-pub struct User {
-    pub wallet: Addr,
-    pub balance: u128,
-}
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]

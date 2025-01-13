@@ -246,7 +246,19 @@ pub fn query(
         QueryMsg::GetPegPrice {} => to_json_binary(&PEG_PRICE.load(deps.storage)?),
         QueryMsg::GetWithdrawalLimit {} => to_json_binary(&WITHDRAWAL_LIMIT.load(deps.storage)?),
         QueryMsg::GetExchange { owner } => query_get_exchange(deps, owner),
+        QueryMsg::GetUserBalance { address } => query_get_user_balance(deps, address),
+        QueryMsg::GetExchangeBalance { address } => query_get_exchange_balance(deps, address),
     }
+}
+
+pub fn query_get_exchange_balance(deps: Deps, address: Addr) -> StdResult<Binary> {
+    let balance = EXCHANGES.load(deps.storage, &address)?.balance;
+    to_json_binary(&balance)
+}
+
+pub fn query_get_user_balance(deps: Deps, address: Addr) -> StdResult<Binary> {
+    let balance = BALANCES.may_load(deps.storage, &address)?.unwrap_or(0);
+    to_json_binary(&balance)
 }
 
 pub fn query_get_exchange(deps: Deps, owner: Addr) -> StdResult<Binary> {
