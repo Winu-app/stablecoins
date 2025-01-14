@@ -182,7 +182,6 @@ fn execute_transfer_funds(
         amount: amount.clone(),
     };
 
-
     let response = Response::new()
         .add_message(CosmosMsg::Bank(send_msg))
         .add_attribute("action", "send_payment")
