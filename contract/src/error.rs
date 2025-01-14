@@ -12,6 +12,12 @@ pub enum ContractError {
     #[error("Insufficient Funds")]
     InsufficientFunds {},
 
+    #[error("Exchange Not Found")]
+    ExchangeNotFound {},
+
+    #[error("Amount to send cannot be empty")]
+    InvalidAmount {},
+
     #[error("Withdrawal Limit Exceeded")]
     WithdrawalLimitExceeded {},
 

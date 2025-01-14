@@ -1,4 +1,4 @@
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{entry_point, to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use crate::error::ContractError;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::state::{BALANCES, EXCHANGES, OWNER, PEG_PRICE, TOTAL_SUPPLY, WITHDRAWAL_LIMIT};
@@ -24,7 +24,7 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -39,6 +39,8 @@ pub fn execute(
         ExecuteMsg::CreateNewExchange { name, withdrawal_limit, initial_funds } => execute_create_new_exchange(deps, info,name,initial_funds,withdrawal_limit),
         ExecuteMsg::BuyFromExchange { exchange_address,amount } => execute_buy_from_exchange(deps, info, exchange_address, amount),
         ExecuteMsg::SellToExchange { exchange_address,amount } => execute_sell_to_exchange(deps, info, exchange_address, amount),
+        
+        ExecuteMsg::TransferFunds { recipient, amount } => execute_transfer_funds(deps, env, info, recipient, amount),
     }
 }
 
@@ -139,13 +141,20 @@ fn execute_burn(
 
 fn execute_buy_from_exchange(deps:DepsMut, info:MessageInfo, exchange_address:Addr, amount: u128)-> Result<Response, ContractError>{
     validate_positive_amount(amount)?;
-    let exchange = &mut EXCHANGES.load(deps.storage, &exchange_address)?;
+    let exchange = EXCHANGES.load(deps.storage, &exchange_address)?;
 
     if amount > exchange.balance {
         return Err(ContractError::InsufficientFunds {});
     }
 
-    exchange.balance -= amount;
+    EXCHANGES.update(deps.storage, &exchange_address, |maybe_exchange| {
+        let mut exchange = maybe_exchange.ok_or(ContractError::ExchangeNotFound {})?;
+        if amount > exchange.balance {
+            return Err(ContractError::InsufficientFunds {});
+        }
+        exchange.balance -= amount;
+        Ok(exchange)
+    })?;
 
     BALANCES.update(deps.storage, &info.sender, |balance| -> Result<_, ContractError> {
         Ok(balance.unwrap_or(0) + amount)
@@ -154,10 +163,53 @@ fn execute_buy_from_exchange(deps:DepsMut, info:MessageInfo, exchange_address:Ad
     Ok(Response::new().add_attribute("action", "buy_coins").add_attribute("amount", amount.to_string()))
 }
 
+fn execute_transfer_funds(
+    _deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    recipient: String,
+    amount: Vec<Coin>,
+) -> Result<Response, ContractError>{
+
+    if amount.is_empty() {
+        return Err(ContractError::InvalidAmount {});
+    }
+    if amount.is_empty() {
+        return Err(ContractError::InvalidAmount {});
+    }
+    let send_msg = BankMsg::Send {
+        to_address: recipient.clone(),
+        amount: amount.clone(),
+    };
+
+
+    let response = Response::new()
+        .add_message(CosmosMsg::Bank(send_msg))
+        .add_attribute("action", "send_payment")
+        .add_attribute("sender", info.sender.to_string())
+        .add_attribute("recipient", recipient)
+        .add_attribute("amount", format!("{:?}", amount));
+
+    Ok(response)
+}
+
 fn execute_sell_to_exchange(deps:DepsMut, info:MessageInfo, exchange_address:Addr, amount: u128)-> Result<Response, ContractError>{
     validate_positive_amount(amount)?;
-    let exchange = &mut EXCHANGES.load(deps.storage, &exchange_address)?;
-    exchange.balance += amount;
+
+    let user_balance = BALANCES.may_load(deps.storage, &info.sender)?.unwrap_or(0);
+
+    if amount > user_balance {
+        return Err(ContractError::InsufficientFunds {});
+    }
+ 
+    EXCHANGES.update(deps.storage, &exchange_address, |maybe_exchange| {
+        let mut exchange = maybe_exchange.ok_or(ContractError::ExchangeNotFound {})?;
+        if amount > exchange.balance {
+            return Err(ContractError::InsufficientFunds {});
+        }
+        exchange.balance += amount;
+        Ok(exchange)
+    })?;
 
     BALANCES.update(deps.storage, &info.sender, |balance| -> Result<_, ContractError> {
         Ok(balance.unwrap_or(0) - amount)
