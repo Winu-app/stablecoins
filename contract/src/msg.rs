@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Coin};
 use serde::{Deserialize, Serialize};
 
 #[cw_serde]
@@ -38,7 +38,9 @@ pub enum ExecuteMsg {
     CreateNewExchange { name: String, withdrawal_limit: u128, initial_funds: u128 },
     BuyFromExchange { exchange_address: Addr, amount: u128 },
     SellToExchange { exchange_address: Addr, amount: u128 },
+    TransferFunds { recipient: String, amount: Vec<Coin> }
 }
+
 
 
 
