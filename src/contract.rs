@@ -17,7 +17,6 @@ pub fn instantiate(
     TOTAL_SUPPLY.save(deps.storage, &msg.initial_supply)?;
     PEG_PRICE.save(deps.storage, &msg.peg_price)?;
     WITHDRAWAL_LIMIT.save(deps.storage, &0u128)?;
-
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
@@ -299,7 +298,23 @@ pub fn query(
         QueryMsg::GetExchange { owner } => query_get_exchange(deps, owner),
         QueryMsg::GetUserBalance { address } => query_get_user_balance(deps, address),
         QueryMsg::GetExchangeBalance { address } => query_get_exchange_balance(deps, address),
+        QueryMsg::GetAllExchanges { } => {
+            let exchanges = query_get_all_exchange(deps)?; 
+            to_json_binary(&exchanges)
+        }, 
     }
+}
+
+pub fn query_get_all_exchange(deps: Deps) -> StdResult<Vec<Exchange>> {
+    let exchanges: Vec<Exchange> = EXCHANGES
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (_, exchange) = item?;
+            Ok(exchange)
+        })
+        .collect::<StdResult<_>>()?;
+
+    Ok(exchanges)
 }
 
 pub fn query_get_exchange_balance(deps: Deps, address: Addr) -> StdResult<Binary> {
