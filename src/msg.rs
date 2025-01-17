@@ -23,7 +23,9 @@ pub enum QueryMsg {
     #[returns(u128)]
     GetUserBalance{address:Addr},
     #[returns(u128)]
-    GetExchangeBalance{address:Addr}
+    GetExchangeBalance{address:Addr},
+    #[returns(Vec<Exchange>)]
+    GetAllExchanges{}
 }
 
 #[cw_serde]
